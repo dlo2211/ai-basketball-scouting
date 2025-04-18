@@ -1,145 +1,120 @@
+# src/scraper.py
+
 import os
 import requests
 from bs4 import BeautifulSoup
-import re
 from urllib.parse import urlparse, parse_qs, unquote
 
-# SerpAPI HTTP endpoint for search
 SERPAPI_SEARCH_URL = "https://serpapi.com/search"
 
 def discover_team_url(name: str, school: str) -> str | None:
-    query = f"{name} {school} athletics player profile"
-    headers = {"User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/114.0.0.0 Safari/537.36"
-    )}
-    resp = requests.post(
-        "https://html.duckduckgo.com/html/",
-        data={"q": query}, timeout=10, headers=headers
-    )
-    resp.raise_for_status()
-    soup = BeautifulSoup(resp.text, "html.parser")
-    for a in soup.find_all("a", class_="result__a", href=True):
-        href = a["href"]
-        if school.replace(" ", "").lower() in href.lower() and "player" in href.lower():
-            return href
+    """(Still unimplemented)"""
     return None
-
-
-def scrape_from_team_url(record: dict, url: str) -> dict | None:
-    # TODO: implement school-site scraping
-    return None
-
 
 def discover_url_via_serpapi(name: str, school: str, site: str) -> str | None:
-    query = f"site:{site} {name} {school}"
-    params = {"engine": "google", "q": query, "api_key": os.getenv("SERPAPI_KEY")}
-    print("DEBUG SerpAPI query:", query)
-    resp = requests.get(SERPAPI_SEARCH_URL, params=params, timeout=10)
-    resp.raise_for_status()
-    data = resp.json()
-    results = data.get("organic_results", [])
-    print(f"DEBUG SerpAPI returned {len(results)} results")
-    for r in results:
+    params = {"engine": "google", "q": f"site:{site} {name} {school}", "api_key": os.getenv("SERPAPI_KEY")}
+    try:
+        resp = requests.get(SERPAPI_SEARCH_URL, params=params, timeout=10)
+        resp.raise_for_status()
+    except requests.RequestException:
+        return None
+    for r in resp.json().get("organic_results", []):
         link = r.get("link")
         if link and site in link:
-            print("DEBUG serpapi selected link:", link)
             return link
-    print("DEBUG serpapi: no matching link")
     return None
-
 
 def discover_espn_url(name: str, school: str) -> str | None:
-    query = f"site:espn.com/womens-college-basketball/player {name} {school}"
-    headers = {"User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/114.0.0.0 Safari/537.36"
-    )}
-    print("DEBUG discover_espn_url query:", query)
-    resp = requests.get(
-        "https://html.duckduckgo.com/html/",
-        params={"q": query}, timeout=10, headers=headers
-    )
-    resp.raise_for_status()
+    """Legacy DuckDuckGo fallback for ESPN URLs"""
+    try:
+        resp = requests.get(
+            "https://html.duckduckgo.com/html/",
+            data={"q": f"site:espn.com/womens-college-basketball/player {name} {school}"},
+            timeout=10
+        )
+        resp.raise_for_status()
+    except requests.RequestException:
+        return None
+
     soup = BeautifulSoup(resp.text, "html.parser")
-    for a in soup.find_all("a", class_="result__a", href=True):
-        raw = a["href"]
-        parsed = urlparse(raw)
-        qs = parse_qs(parsed.query)
-        candidate = unquote(qs["uddg"][0]) if "uddg" in qs else raw
-        print("DEBUG espn discovery candidate:", candidate)
-        if "/womens-college-basketball/player/" in candidate:
-            print("DEBUG espn_url selected:", candidate)
-            return candidate
-    print("DEBUG espn_url: none matched")
+    for a in soup.select("a.result__a[href]"):
+        href = a["href"]
+        parsed = urlparse(href)
+        # DuckDuckGo wraps real link in uddg=…  
+        link = parse_qs(parsed.query).get("uddg", [href])[0]
+        if "/womens-college-basketball/player/" in link:
+            return link
     return None
 
-
 def scrape_from_espn_url(record: dict, url: str) -> dict:
-    headers = {"User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/114.0.0.0 Safari/537.36"
-    )}
-    resp = requests.get(url, headers=headers, timeout=10)
-    resp.raise_for_status()
-    page_text = BeautifulSoup(resp.text, "html.parser").get_text()
+    """Robust scraper: summary block → career table → None"""
+    headers = {"User-Agent": "Mozilla/5.0"}
+    try:
+        resp = requests.get(url, headers=headers, timeout=10)
+        resp.raise_for_status()
+    except requests.RequestException:
+        return {**record, **dict.fromkeys(("points_per_game","rebounds_per_game","assists_per_game"))}
 
-    stats = {"points_per_game": None, "rebounds_per_game": None, "assists_per_game": None}
-    m = re.search(r"PTS\s*([\d\.]+)", page_text)
-    if m:
-        stats["points_per_game"] = float(m.group(1))
-    m = re.search(r"REB\s*([\d\.]+)", page_text)
-    if m:
-        stats["rebounds_per_game"] = float(m.group(1))
-    m = re.search(r"AST\s*([\d\.]+)", page_text)
-    if m:
-        stats["assists_per_game"] = float(m.group(1))
+    soup = BeautifulSoup(resp.text, "html.parser")
 
-    return { **record, **stats }
+    # 1) SUMMARY BLOCK: '2024-25 SEASON STATS'
+    summary = soup.select_one("div.Table__Scroller table") or soup.select_one("div.PlayerHeader__Stats")
+    if summary and "Season Stats" in resp.text:
+        # ESPN’s summary block often uses spans with .value
+        vals = summary.select("span.value")[:3]
+        if len(vals) >= 3:
+            try:
+                ppg, rpg, apg = [float(v.get_text(strip=True)) for v in vals]
+                return {**record, "points_per_game": ppg, "rebounds_per_game": rpg, "assists_per_game": apg}
+            except ValueError:
+                pass
 
+    # 2) CAREER‑STATS TABLE fallback
+    table = soup.select_one("div.Table__Scroller table")
+    if table:
+        tbody = table.select_one("tbody.Table__TBODY")
+        # try 2024-25 then 2023-24
+        for idx in ("0","1"):
+            row = tbody.select_one(f'tr[data-idx="{idx}"]')
+            if row:
+                cells = row.find_all("td")
+                try:
+                    return {
+                        **record,
+                        "points_per_game": float(cells[2].get_text(strip=True)),
+                        "rebounds_per_game": float(cells[3].get_text(strip=True)),
+                        "assists_per_game": float(cells[4].get_text(strip=True))
+                    }
+                except (IndexError, ValueError):
+                    continue
+
+    # 3) Nothing worked
+    return {**record, **dict.fromkeys(("points_per_game","rebounds_per_game","assists_per_game"))}
 
 def scrape_player(record: dict) -> dict:
-    full_name = f"{record['first_name']} {record['last_name']}"
-    school = record['school']
+    """Master orchestrator with all fallbacks."""
+    try:
+        name   = f"{record['first_name']} {record['last_name']}"
+        school = record["school"]
+    except KeyError:
+        return {**record, **dict.fromkeys(("points_per_game","rebounds_per_game","assists_per_game"))}
 
-    # 1) Team site
-    team_url = discover_team_url(full_name, school)
-    print("DEBUG team_url:", team_url)
-    if team_url:
-        stats = scrape_from_team_url(record, team_url)
-        if stats:
-            return stats
+    # 1) Team site (not yet built)
+    url = discover_team_url(name, school)
+    if url:
+        out = scrape_from_espn_url(record, url)
+        if any(out[k] is not None for k in ("points_per_game","rebounds_per_game","assists_per_game")):
+            return out
 
-    # 2) Manual override
-    manual = record.get("espn_url")
-    if manual:
-        print("DEBUG using provided espn_url:", manual)
-        return scrape_from_espn_url(record, manual)
+    # 2) SerpAPI → ESPN
+    url = discover_url_via_serpapi(name, school, "espn.com/womens-college-basketball/player")
+    if url:
+        return scrape_from_espn_url(record, url)
 
-    # 3) SerpAPI search
-    serp_url = discover_url_via_serpapi(
-        full_name,
-        school,
-        "espn.com/womens-college-basketball/player"
-    )
-    print("DEBUG serpapi espn_url:", serp_url)
-    if serp_url:
-        return scrape_from_espn_url(record, serp_url)
+    # 3) DuckDuckGo → ESPN
+    url = discover_espn_url(name, school)
+    if url:
+        return scrape_from_espn_url(record, url)
 
-    # 4) Legacy fallback
-    espn_url = discover_espn_url(full_name, school)
-    print("DEBUG legacy espn_url:", espn_url)
-    if espn_url:
-        return scrape_from_espn_url(record, espn_url)
-
-    # 5) Final fallback
-    print("DEBUG all methods failed, returning None stats")
-    return {
-        **record,
-        "points_per_game": None,
-        "rebounds_per_game": None,
-        "assists_per_game": None
-    }
+    # 4) All fallbacks failed
+    return {**record, **dict.fromkeys(("points_per_game","rebounds_per_game","assists_per_game"))}

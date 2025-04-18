@@ -1,98 +1,93 @@
 # src/app.py
+
 import os
-from dotenv import load_dotenv
+import json
 import streamlit as st
 import pandas as pd
-from csv_loader import load_players
-from scraper import scrape_player
-import openai
+from dotenv import load_dotenv
+from openai import OpenAI
+from src.scraper import scrape_player
 
-# Load environment variables
+# Load .env
 load_dotenv()
 
-# Streamlit page setup
-st.set_page_config(page_title="AI Basketball Scouting Assistant", layout="wide")
-st.title("🏀 AI Basketball Scouting Assistant")
+st.set_page_config(page_title="🏀 AI Basketball Scout", layout="wide")
 
-# Initialize session state for dataframes and conversation history
-if "df" not in st.session_state:
-    st.session_state.df = None
-if "df_enriched" not in st.session_state:
-    st.session_state.df_enriched = None
-if "conversation" not in st.session_state:
-    st.session_state.conversation = None
+if "messages" not in st.session_state:
+    st.session_state.messages = [
+        {"role": "system", "content":
+            "You are AI Basketball Scout ChatBot. "
+            "I will upload a roster CSV, you will scrape each player's 2024‑25 (or 2023‑24) PPG/RPG/APG, "
+            "then we’ll chat about that enriched roster."
+        }
+    ]
 
-# -----------------------------------------------------------------------------
-# 1) File Upload Section
-# -----------------------------------------------------------------------------
-st.header("1. Upload Roster CSV")
-uploaded_file = st.file_uploader(
-    label="Browse and upload your NCAA roster CSV file",
-    type=["csv"],
-    help="Select a CSV with columns First Name, Last Name, Institution"
-)
+st.title("🏀 AI Basketball Scout")
+st.write("This is a conversational front end powered by OpenAI. Upload a roster to begin.")
 
-if uploaded_file:
-    st.info("Loading roster into DataFrame...")
-    st.session_state.df = load_players(uploaded_file)
-    st.success(f"Loaded {len(st.session_state.df)} players")
-    st.dataframe(st.session_state.df)
+# 1) File uploader
+uploaded = st.file_uploader("Choose a roster CSV", type="csv")
 
-# -----------------------------------------------------------------------------
-# 2) Data Enrichment (Scraping)
-# -----------------------------------------------------------------------------
-st.header("2. Scrape Stats")
-if st.session_state.df is not None:
-    if st.button("Run Scraping Logic"):
-        with st.spinner("Enriching each player with PPG/RPG/APG..."):
-            enriched = [scrape_player(row.to_dict()) for _, row in st.session_state.df.iterrows()]
-            st.session_state.df_enriched = pd.DataFrame(enriched)
-    if st.session_state.df_enriched is not None:
-        st.success("Scraping complete!")
-        st.dataframe(st.session_state.df_enriched)
-        csv_bytes = st.session_state.df_enriched.to_csv(index=False).encode()
-        st.download_button(
-            label="Download enriched_players.csv",
-            data=csv_bytes,
-            file_name="enriched_players.csv",
-            mime="text/csv",
-        )
+@st.cache_data(show_spinner=False)
+def get_enriched_df(records):
+    """Scrape all players once, showing progress."""
+    df_list = []
+    prog = st.progress(0, text="Scraping stats…")
+    total = len(records)
+    for idx, rec in enumerate(records, start=1):
+        df_list.append(scrape_player(rec))
+        prog.progress(idx / total, text=f"Processed {idx}/{total}")
+    return pd.DataFrame(df_list)
 
-        # ---------------------------------------------------------------------
-        # 3) Chat‑Style Filtering
-        # ---------------------------------------------------------------------
-        st.header("3. Chat‑Style Filtering")
-        openai.api_key = os.getenv("OPENAI_API_KEY")
-        client = openai.OpenAI(api_key=openai.api_key)
+# 2) Process upload
+if uploaded:
+    raw_df = pd.read_csv(uploaded)
+    raw_df = raw_df.rename(columns={
+        "First Name": "first_name",
+        "Last Name":  "last_name",
+        "Institution":"school"
+    })
+    records = raw_df.to_dict(orient="records")
 
-        if st.session_state.conversation is None:
-            system_msg = {
-                "role": "system",
-                "content": (
-                    "You convert natural‑language filters into pandas query expressions. "
-                    "Columns: first_name, last_name, school, points_per_game, rebounds_per_game, assists_per_game. "
-                    "Respond with exactly the boolean expression, e.g. 'points_per_game >= 2.5'."
-                )
-            }
-            st.session_state.conversation = [system_msg]
+    # Only scrape once per session
+    if "enriched_df" not in st.session_state:
+        st.session_state.enriched_df = get_enriched_df(records)
+        st.success(f"✅ Scraped stats for {len(records)} players")
 
-        user_input = st.chat_input("Type a filter (e.g. 'under 8 PPG')")
-        if user_input:
-            st.session_state.conversation.append({"role": "user", "content": user_input})
+# If no data yet, stop here
+if "enriched_df" not in st.session_state:
+    st.stop()
+
+# 3) Tabs: Roster view and Chat
+tab1, tab2 = st.tabs(["Roster", "Scout Chat"])
+
+with tab1:
+    st.markdown("### Enriched Roster with Stats")
+    st.dataframe(st.session_state.enriched_df, use_container_width=True)
+
+with tab2:
+    st.header("Chat with your Scout")
+    # render history
+    for msg in st.session_state.messages:
+        st.chat_message(msg["role"]).write(msg["content"])
+    # get user input
+    user_input = st.chat_input("Ask a question about this roster…")
+    if user_input:
+        st.session_state.messages.append({"role": "user", "content": user_input})
+
+        roster_json = json.dumps(st.session_state.enriched_df.to_dict(orient="records"))
+        api_msgs = [
+            st.session_state.messages[0],
+            {"role": "system", "content": f"Roster data: {roster_json}"}
+        ] + st.session_state.messages[1:]
+
+        with st.spinner("🤖 Thinking…"):
+            client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
             resp = client.chat.completions.create(
                 model="gpt-4o-mini",
-                messages=st.session_state.conversation,
-                temperature=0.0
+                messages=api_msgs
             )
-            expr = resp.choices[0].message.content.strip()
-            st.session_state.conversation.append({"role": "assistant", "content": expr})
+            answer = resp.choices[0].message.content
 
-            st.markdown(f"**Applying filter:** `{expr}`")
-            try:
-                df_filtered = st.session_state.df_enriched.query(expr)
-                if df_filtered.empty:
-                    st.warning("No players matched your criteria.")
-                else:
-                    st.dataframe(df_filtered)
-            except Exception as e:
-                st.error(f"Failed to apply filter: {e}")
+        st.session_state.messages.append({"role": "assistant", "content": answer})
+        st.chat_message("assistant").write(answer)
