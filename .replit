@@ -1,2 +1,10 @@
-language = "python3"
-entrypoint = "streamlit run src/app.py --server.port=$PORT --server.address=0.0.0.0 --server.headless true"
+language = "bash"
+run = ".pythonlibs/bin/python -m streamlit run src/app.py \
+  --server.port=8080 \
+  --server.address=0.0.0.0 \
+  --server.enableCORS=false \
+  --server.headless=true"
+
+[[ports]]
+localPort = 8080
+externalPort = 80
