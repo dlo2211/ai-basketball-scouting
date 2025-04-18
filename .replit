@@ -1,2 +1,10 @@
+Here’s the complete updated `.replit` file—just replace your existing one with this:
+
+```toml
 language = "bash"
-run = "venv/bin/python3 -m streamlit.web.cli run src/app.py --server.port=$PORT --server.address=0.0.0.0 --server.headless=true"
+run = "venv/bin/python3 -m streamlit.cli run src/app.py --server.port=3000 --browser.serverAddress=0.0.0.0 --server.headless=true"
+
+[[ports]]
+localPort = 3000
+externalPort = 80
+```
