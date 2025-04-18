@@ -1,8 +1,15 @@
-language = "bash"
-run = "bash -lc \".pythonlibs/bin/python -m streamlit run src/app.py \
-  --server.port=$PORT \
-  --server.address=0.0.0.0 \
-  --server.headless=true \
-  --server.enableCORS=false\""
+entrypoint = "main.py"
+modules = ["python-3.11"]
 
-# No need to manually map ports—Replit will forward $PORT → external 80 automatically
+[nix]
+channel = "stable-24_05"
+
+[unitTest]
+language = "python3"
+
+[gitHubImport]
+requiredFiles = [".replit", "replit.nix"]
+
+[deployment]
+run = ["python3", "main.py"]
+deploymentTarget = "cloudrun"
