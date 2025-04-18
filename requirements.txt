@@ -4,3 +4,6 @@ requests==2.32.3
 beautifulsoup4==4.12.3
 openai==1.57.0
 python-dotenv==1.0.1
+serpapi==0.1.5
+streamlit
+python-dotenv
