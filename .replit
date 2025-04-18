@@ -1,2 +1,2 @@
-language = "python"
-run = "python3 -m streamlit run src/app.py --server.port=$PORT --server.headless=true"
+language = "bash"
+run = "venv/bin/python3 -m streamlit.web.cli run src/app.py --server.port=$PORT --server.headless=true"
