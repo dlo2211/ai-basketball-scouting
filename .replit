@@ -1,15 +1,12 @@
-entrypoint = "main.py"
-modules = ["python-3.11"]
+language = "bash"
+run = ".pythonlibs/bin/python -m streamlit run src/app.py \
+  --server.port=8501 \
+  --server.address=0.0.0.0 \
+  --browser.serverAddress=0.0.0.0 \
+  --server.enableCORS=false \
+  --server.enableXsrfProtection=false \
+  --server.headless=true"
 
-[nix]
-channel = "stable-24_05"
-
-[unitTest]
-language = "python3"
-
-[gitHubImport]
-requiredFiles = [".replit", "replit.nix"]
-
-[deployment]
-run = ["python3", "main.py"]
-deploymentTarget = "cloudrun"
+[[ports]]
+localPort = 8501
+externalPort = 80
