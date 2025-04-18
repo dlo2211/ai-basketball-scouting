@@ -1,10 +1,15 @@
-Here’s the complete updated `.replit` file—just replace your existing one with this:
+entrypoint = "main.py"
+modules = ["python-3.11"]
 
-```toml
-language = "bash"
-run = "venv/bin/python3 -m streamlit.cli run src/app.py --server.port=3000 --browser.serverAddress=0.0.0.0 --server.headless=true"
+[nix]
+channel = "stable-24_05"
 
-[[ports]]
-localPort = 3000
-externalPort = 80
-```
+[unitTest]
+language = "python3"
+
+[gitHubImport]
+requiredFiles = [".replit", "replit.nix"]
+
+[deployment]
+run = ["python3", "main.py"]
+deploymentTarget = "cloudrun"
