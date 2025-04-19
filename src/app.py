@@ -1,7 +1,17 @@
 import streamlit as st
+import pandas as pd
 
-# Make sure page config is first
-st.set_page_config(page_title="Test", layout="wide")
+# 1. Page config
+st.set_page_config(page_title="🏀 AI Basketball Scout", layout="wide")
 
-st.title("🐣 Hello world!")
-st.write("If you see this, the server is running.")
+# 2. Title & uploader
+st.title("🏀 AI Basketball Scout – Upload Test")
+uploaded = st.file_uploader("Upload roster CSV", type="csv")
+if not uploaded:
+    st.info("Please upload a roster CSV to begin.")
+    st.stop()
+
+# 3. Load & display
+df = pd.read_csv(uploaded)
+st.markdown("## CSV Preview")
+st.dataframe(df, use_container_width=True)
