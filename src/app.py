@@ -1,8 +1,5 @@
-import subprocess, streamlit as st
-sha = subprocess.getoutput("git rev-parse --short HEAD")
 import streamlit as st
-import os
-import json
+st.set_page_config(page_title="🏀 AI Basketball Scout", layout="wide")
 import logging
 import pandas as pd
 from scraper import scrape_player
