@@ -1,5 +1,4 @@
 # Updated `src/app.py`
-```python
 import os
 import json
 import logging
@@ -89,7 +88,6 @@ if user_input:
     answer = resp.choices[0].message.content
     st.session_state.messages.append({"role": "assistant", "content": answer})
     st.chat_message("assistant").write(answer)
-```
 
 ---
 
