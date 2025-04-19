@@ -1,3 +1,6 @@
+import subprocess, streamlit as st
+sha = subprocess.getoutput("git rev-parse --short HEAD")
+st.markdown(f"**Deployed commit:** `{sha}`")
 import pkg_resources
 import streamlit as st
 import os
