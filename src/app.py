@@ -7,7 +7,7 @@ import os
 import json
 import logging
 import pandas as pd
-from src.scraper import scrape_player
+from scraper import scrape_player
 
 # ——— Debug: list installed packages ———
 installed = sorted(f"{p.project_name}=={p.version}" for p in pkg_resources.working_set)
