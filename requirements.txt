@@ -5,3 +5,4 @@ beautifulsoup4==4.12.3
 openai==1.57.0
 serpapi==0.1.5
 python-dotenv==1.0.1
+setuptools
