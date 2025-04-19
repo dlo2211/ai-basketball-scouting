@@ -4,9 +4,6 @@ import logging
 import pandas as pd
 from scraper import scrape_player
 
-# ——— Debug: list installed packages ———
-installed = sorted(f"{p.project_name}=={p.version}" for p in pkg_resources.working_set)
-
 enriched_df = enrich(df.to_dict("records"))
 st.success(f"✅ Scraped stats for {len(enriched_df)} players")
 
