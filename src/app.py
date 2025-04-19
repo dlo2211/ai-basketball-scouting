@@ -82,8 +82,13 @@ user_input = st.chat_input("Ask anything about this roster...")
 if user_input:
     st.session_state.messages.append({"role":"user","content":user_input})
     roster_json = enriched_df.to_json(orient="records")
-    api_msgs = [st.session_state.messages[0], {"role":"system","content":f"Roster data: {roster_json}"}] + st.session_state.messages[1:]
-    resp = client.chat.completions.create(model="gpt-4o-mini", messages=api_msgs)
+    api_msgs = [
+        st.session_state.messages[0],
+        {"role":"system","content":f"Roster data: {roster_json}"}
+    ] + st.session_state.messages[1:]
+    resp = OpenAI(api_key=OPENAI_API_KEY).chat.completions.create(
+        model="gpt-4o-mini", messages=api_msgs
+    )
     answer = resp.choices[0].message.content
     st.session_state.messages.append({"role":"assistant","content":answer})
     st.chat_message("assistant").write(answer)
