@@ -201,6 +201,34 @@ def scrape_player(record):
 import requests
 from bs4 import BeautifulSoup
 
+def scrape_from_sportsref(record):
+    """Fallback scraper: Sports-Reference college basketball."""
+    slug = f"{record['last_name'].lower()}-{record['first_name'].lower()}"
+    url = f"https://www.sports-reference.com/cbb/players/{slug}-1.html"
+    try:
+        resp = requests.get(url, timeout=5)
+        soup = BeautifulSoup(resp.text, "html.parser")
+        return parse_sportsref_stats(soup)
+    except:
+        return {"ppg": None, "rpg": None, "apg": None}
+
+# ensure you import your ESPN scraper correctly:
+from scraper import scrape_from_espn
+
+def scrape_player(record):
+    """Try ESPN first; if any stat is missing, fall back to Sports‑Reference."""
+    primary = scrape_from_espn(record)
+    if None in (primary.get("ppg"), primary.get("rpg"), primary.get("apg")):
+        fallback = scrape_from_sportsref(record)
+        return {
+            "ppg": primary.get("ppg") or fallback.get("ppg"),
+            "rpg": primary.get("rpg") or fallback.get("rpg"),
+            "apg": primary.get("apg") or fallback.get("apg"),
+        }
+    return primary
+import requests
+from bs4 import BeautifulSoup
+
 def parse_sportsref_stats(soup):
     """
     Extract PPG, RPG, APG from a Sports-Reference college basketball page.
@@ -232,18 +260,3 @@ def scrape_from_sportsref(record):
         return parse_sportsref_stats(soup)
     except:
         return {"ppg": None, "rpg": None, "apg": None}
-
-# ensure you import your ESPN scraper correctly:
-from scraper import scrape_from_espn
-
-def scrape_player(record):
-    """Try ESPN first; if any stat is missing, fall back to Sports‑Reference."""
-    primary = scrape_from_espn(record)
-    if None in (primary.get("ppg"), primary.get("rpg"), primary.get("apg")):
-        fallback = scrape_from_sportsref(record)
-        return {
-            "ppg": primary.get("ppg") or fallback.get("ppg"),
-            "rpg": primary.get("rpg") or fallback.get("rpg"),
-            "apg": primary.get("apg") or fallback.get("apg"),
-        }
-    return primary
