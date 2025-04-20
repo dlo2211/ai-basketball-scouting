@@ -122,11 +122,6 @@ def scrape_player(record: dict) -> dict:
 import requests
 from bs4 import BeautifulSoup
 
-def parse_sportsref_stats(soup):
-    \"\"\"\n    Extract PPG, RPG, APG from a Sports‑Reference college basketball page.\"\"\"
-    table = soup.select_one("#per_game table")
-    if not table:
-        return {"ppg": None, "rpg": None, "apg": None}
     rows = table.select("tbody tr")
     if not rows:
         return {"ppg": None, "rpg": None, "apg": None}
@@ -153,6 +148,54 @@ def scrape_from_sportsref(record):
 
 def scrape_player(record):
     \"\"\"Orchestrator: primary ESPN, then Sports‑Reference fallback.\"\"\"
+    primary = scrape_from_espn(record)
+    if None in (primary.get("ppg"), primary.get("rpg"), primary.get("apg")):
+        fallback = scrape_from_sportsref(record)
+        return {
+            "ppg": primary.get("ppg") or fallback.get("ppg"),
+            "rpg": primary.get("rpg") or fallback.get("rpg"),
+            "apg": primary.get("apg") or fallback.get("apg"),
+        }
+    return primary
+
+import requests
+from bs4 import BeautifulSoup
+
+def parse_sportsref_stats(soup):
+    """
+    Extract PPG, RPG, APG from a Sports-Reference college basketball page.
+    """
+    table = soup.select_one("#per_game table")
+    if not table:
+        return {"ppg": None, "rpg": None, "apg": None}
+    rows = table.select("tbody tr")
+    if not rows:
+        return {"ppg": None, "rpg": None, "apg": None}
+    last = rows[-1]
+    cells = last.find_all("td")
+    try:
+        ppg = float(cells[3].text)
+        rpg = float(cells[5].text)
+        apg = float(cells[6].text)
+        return {"ppg": ppg, "rpg": rpg, "apg": apg}
+    except Exception:
+        return {"ppg": None, "rpg": None, "apg": None}
+
+def scrape_from_sportsref(record):
+    """Fallback scraper: Sports-Reference college basketball."""
+    slug = f"{record['last_name'].lower()}-{record['first_name'].lower()}"
+    url = f"https://www.sports-reference.com/cbb/players/{slug}-1.html"
+    try:
+        resp = requests.get(url, timeout=5)
+        soup = BeautifulSoup(resp.text, "html.parser")
+        return parse_sportsref_stats(soup)
+    except Exception:
+        return {"ppg": None, "rpg": None, "apg": None}
+
+# Re‑define the orchestrator (drop your previous sed‑overwritten scrape_player)
+from src.scraper import scrape_from_espn  # make sure this import exists
+def scrape_player(record):
+    """Orchestrator: try ESPN first, then Sports-Reference."""
     primary = scrape_from_espn(record)
     if None in (primary.get("ppg"), primary.get("rpg"), primary.get("apg")):
         fallback = scrape_from_sportsref(record)
