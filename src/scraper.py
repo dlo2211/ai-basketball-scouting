@@ -1,5 +1,3 @@
-# src/scraper.py
-
 import re
 import requests
 import pandas as pd
@@ -13,18 +11,18 @@ def parse_sportsref_stats(soup: BeautifulSoup) -> Dict[str, Any]:
      1) the live <table id="per_game">, or
      2) the commented-out table inside <div id="all_per_game">.
     """
-    live_table = soup.find("table", id="per_game")
-    html_table = None
+    # Try the live table first
+    live = soup.find("table", id="per_game")
+    html_table = str(live) if live else None
 
-    if live_table:
-        html_table = str(live_table)
-    else:
+    if not html_table:
+        # Fallback: look for commented-out table in div#all_per_game
         wrapper = soup.find("div", id="all_per_game")
         if wrapper:
             m = re.search(
                 r'<!--\s*(<table[^>]*id="per_game"[^>]*>.*?</table>)\s*-->',
                 str(wrapper),
-                flags=re.DOTALL
+                flags=re.DOTALL,
             )
             if m:
                 html_table = m.group(1)
@@ -32,6 +30,7 @@ def parse_sportsref_stats(soup: BeautifulSoup) -> Dict[str, Any]:
     if not html_table:
         return {"ppg": None, "rpg": None, "apg": None}
 
+    # Parse with pandas
     try:
         df = pd.read_html(html_table)[0]
     except ValueError:
@@ -53,11 +52,9 @@ def parse_sportsref_stats(soup: BeautifulSoup) -> Dict[str, Any]:
 
 def scrape_from_sportsref(player: Dict[str, str]) -> Dict[str, Any]:
     """
-    Given {"first_name": "...", "last_name": "..."}, build the Sports‑Ref URL,
-    fetch, parse, and return {"status":…, "ppg":…, "rpg":…, "apg":…}.
+    Given {"first_name": "...", "last_name": "..."}, fetch and parse stats.
     """
-    last = player["last_name"].lower()
-    first = player["first_name"].lower()
+    last, first = player["last_name"].lower(), player["first_name"].lower()
     slug = f"{last}-{first}"
     url = f"https://www.sports-reference.com/cbb/players/{last[0]}/{slug}-1.html"
     print(f"Trying Sports‑Ref URL '{url}'", end="")
@@ -70,5 +67,5 @@ def scrape_from_sportsref(player: Dict[str, str]) -> Dict[str, Any]:
     stats = parse_sportsref_stats(soup)
     return {"status": 200, **stats}
 
-# alias for app.py
+# alias for backward‑compat with app.py
 scrape_player = scrape_from_sportsref
