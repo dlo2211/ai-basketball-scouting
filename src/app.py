@@ -1,24 +1,31 @@
-# ... your existing imports ...
+# src/app.py
+
 import streamlit as st
 import pandas as pd
+from typing import Dict, Any
 from src.scraper import scrape_player
 
 st.set_page_config(page_title="🏀 AI Basketball Scout", layout="wide")
+st.title("🏀 AI Basketball Scout")
 
-# — Read your CSV file upload …
-uploaded = st.file_uploader("Upload players CSV", type="csv")
+# — Read API keys …
+OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
+SERPAPI_KEY    = st.secrets["SERPAPI_KEY"]
+
+st.sidebar.header("Upload roster CSV")
+uploaded = st.sidebar.file_uploader("Drag and drop file here", type="csv")
+
 if uploaded:
-    players_df = pd.read_csv(uploaded)
-    enriched_rows = []
-    for _, row in players_df.iterrows():
-        base = {"first_name": row.first_name, "last_name": row.last_name}
-        stats = scrape_player(base)
-        enriched_rows.append({**base, **stats})
-    enriched = pd.DataFrame(enriched_rows)
+    df = pd.read_csv(uploaded)
+    # Expect columns: first_name, last_name
+    stats = []
+    for row in df.to_dict(orient="records"):
+        s = scrape_player(row)
+        stats.append(s)
+    stats_df = pd.DataFrame(stats)
+    result = pd.concat([df, stats_df], axis=1)
 
-    # Display with source & note
-    enriched = enriched.astype(str)
-    st.dataframe(enriched[[
-        "first_name","last_name","status",
-        "ppg","rpg","apg","source","note"
-    ]])
+    st.success(f"Scraped stats for {len(result)} players")
+    st.dataframe(result)
+
+    # … your existing chat UI below …

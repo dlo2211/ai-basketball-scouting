@@ -6,7 +6,7 @@ from typing import Dict, Any
 
 def scrape_from_ncaa(player: Dict[str, str]) -> Dict[str, Any]:
     """
-    Fallback #1: scrape stats from data.ncaa.com
+    First‐fallback: try NCAA.com stats.
     """
     last, first = player["last_name"].lower(), player["first_name"].lower()
     url = f"https://data.ncaa.com/casbasketball/{last}-{first}"
@@ -14,7 +14,9 @@ def scrape_from_ncaa(player: Dict[str, str]) -> Dict[str, Any]:
     if resp.status_code != 200:
         return {
             "status": resp.status_code,
-            "ppg": None, "rpg": None, "apg": None,
+            "ppg": None,
+            "rpg": None,
+            "apg": None,
             "source": "ncaa",
             "note": f"NCAA {resp.status_code}"
         }
@@ -26,14 +28,18 @@ def scrape_from_ncaa(player: Dict[str, str]) -> Dict[str, Any]:
         apg = float(soup.select_one(".stat-apg").text)
         return {
             "status": 200,
-            "ppg": ppg, "rpg": rpg, "apg": apg,
+            "ppg": ppg,
+            "rpg": rpg,
+            "apg": apg,
             "source": "ncaa",
             "note": ""
         }
     except Exception:
         return {
             "status": 200,
-            "ppg": None, "rpg": None, "apg": None,
+            "ppg": None,
+            "rpg": None,
+            "apg": None,
             "source": "ncaa",
             "note": "NCAA parse failed"
         }
