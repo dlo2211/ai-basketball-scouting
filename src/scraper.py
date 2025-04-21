@@ -72,3 +72,6 @@ def scrape_from_sportsref(player: Dict[str, str]) -> Dict[str, Any]:
 
     soup = BeautifulSoup(resp.text, "html.parser")
     return parse_sportsref_stats(soup)
+
+# alias for backward‑compat with app.py’s import
+scrape_player = scrape_from_sportsref
