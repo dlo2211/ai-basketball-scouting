@@ -7,22 +7,17 @@ from typing import Dict, Any
 def parse_sportsref_stats(soup: BeautifulSoup) -> Dict[str, Any]:
     """
     Extract PPG, RPG, APG from a Sports-Reference college basketball page.
-    Uses pandas.read_html on either:
-     1) the live <table id="per_game">, or
-     2) the commented-out table inside <div id="all_per_game">.
     """
-    # Try the live table first
     live = soup.find("table", id="per_game")
     html_table = str(live) if live else None
 
     if not html_table:
-        # Fallback: look for commented-out table in div#all_per_game
         wrapper = soup.find("div", id="all_per_game")
         if wrapper:
             m = re.search(
                 r'<!--\s*(<table[^>]*id="per_game"[^>]*>.*?</table>)\s*-->',
                 str(wrapper),
-                flags=re.DOTALL,
+                flags=re.DOTALL
             )
             if m:
                 html_table = m.group(1)
@@ -30,7 +25,6 @@ def parse_sportsref_stats(soup: BeautifulSoup) -> Dict[str, Any]:
     if not html_table:
         return {"ppg": None, "rpg": None, "apg": None}
 
-    # Parse with pandas
     try:
         df = pd.read_html(html_table)[0]
     except ValueError:
@@ -67,5 +61,5 @@ def scrape_from_sportsref(player: Dict[str, str]) -> Dict[str, Any]:
     stats = parse_sportsref_stats(soup)
     return {"status": 200, **stats}
 
-# alias for backward‑compat with app.py
+# For backward‑compat with app.py
 scrape_player = scrape_from_sportsref
