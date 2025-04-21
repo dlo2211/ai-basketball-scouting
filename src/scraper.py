@@ -13,14 +13,12 @@ def parse_sportsref_stats(soup: BeautifulSoup) -> Dict[str, Any]:
      1) the live <table id="per_game">, or
      2) the commented-out table inside <div id="all_per_game">.
     """
-    # 1) Try the live table first
     live_table = soup.find("table", id="per_game")
     html_table = None
 
     if live_table:
         html_table = str(live_table)
     else:
-        # 2) Fallback: extract the commented table inside div#all_per_game
         wrapper = soup.find("div", id="all_per_game")
         if wrapper:
             m = re.search(
@@ -34,7 +32,6 @@ def parse_sportsref_stats(soup: BeautifulSoup) -> Dict[str, Any]:
     if not html_table:
         return {"ppg": None, "rpg": None, "apg": None}
 
-    # 3) Parse with pandas
     try:
         df = pd.read_html(html_table)[0]
     except ValueError:
@@ -43,7 +40,6 @@ def parse_sportsref_stats(soup: BeautifulSoup) -> Dict[str, Any]:
     if df.empty:
         return {"ppg": None, "rpg": None, "apg": None}
 
-    # 4) Take the last row
     last = df.iloc[-1]
     ppg = last.get("PTS", last.get("PPG", None))
     rpg = last.get("TRB", last.get("RPG", None))
@@ -58,9 +54,10 @@ def parse_sportsref_stats(soup: BeautifulSoup) -> Dict[str, Any]:
 def scrape_from_sportsref(player: Dict[str, str]) -> Dict[str, Any]:
     """
     Given {"first_name": "...", "last_name": "..."}, build the Sports‑Ref URL,
-    request it, parse the PPG/RPG/APG, and return a dict with status & stats.
+    fetch, parse, and return {"status":…, "ppg":…, "rpg":…, "apg":…}.
     """
-    last, first = player["last_name"].lower(), player["first_name"].lower()
+    last = player["last_name"].lower()
+    first = player["first_name"].lower()
     slug = f"{last}-{first}"
     url = f"https://www.sports-reference.com/cbb/players/{last[0]}/{slug}-1.html"
     print(f"Trying Sports‑Ref URL '{url}'", end="")
@@ -73,5 +70,5 @@ def scrape_from_sportsref(player: Dict[str, str]) -> Dict[str, Any]:
     stats = parse_sportsref_stats(soup)
     return {"status": 200, **stats}
 
-# alias for backward‑compat with app.py
+# alias for app.py
 scrape_player = scrape_from_sportsref
