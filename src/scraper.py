@@ -35,8 +35,6 @@ def parse_sportsref_stats(soup: BeautifulSoup) -> Dict[str, Any]:
         return {"ppg": None, "rpg": None, "apg": None}
 
     # 3) Parse with pandas
-
-    # 3) Parse with pandas
     try:
         df = pd.read_html(html_table)[0]
     except ValueError:
@@ -59,19 +57,21 @@ def parse_sportsref_stats(soup: BeautifulSoup) -> Dict[str, Any]:
 
 def scrape_from_sportsref(player: Dict[str, str]) -> Dict[str, Any]:
     """
-    Build the URL based on player’s name, fetch the page, and return stats.
+    Given {"first_name": "...", "last_name": "..."}, build the Sports‑Ref URL,
+    request it, parse the PPG/RPG/APG, and return a dict with status & stats.
     """
-    slug = f"{player['last_name'].lower()}-{player['first_name'].lower()}"
-    url = f"https://www.sports-reference.com/cbb/players/{player['last_name'][0].lower()}/{slug}-1.html"
+    last, first = player["last_name"].lower(), player["first_name"].lower()
+    slug = f"{last}-{first}"
+    url = f"https://www.sports-reference.com/cbb/players/{last[0]}/{slug}-1.html"
     print(f"Trying Sports‑Ref URL '{url}'", end="")
-
     resp = requests.get(url)
     print(f" → status {resp.status_code}")
     if resp.status_code != 200:
-        return {"ppg": None, "rpg": None, "apg": None}
+        return {"status": resp.status_code, "ppg": None, "rpg": None, "apg": None}
 
     soup = BeautifulSoup(resp.text, "html.parser")
-    return parse_sportsref_stats(soup)
+    stats = parse_sportsref_stats(soup)
+    return {"status": 200, **stats}
 
-# alias for backward‑compat with app.py’s import
+# alias for backward‑compat with app.py
 scrape_player = scrape_from_sportsref
