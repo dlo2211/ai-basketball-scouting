@@ -3,7 +3,7 @@
 import re
 import requests
 import pandas as pd
-from bs4 import BeautifulSoup, Comment
+from bs4 import BeautifulSoup
 from typing import Dict, Any
 
 def parse_sportsref_stats(soup: BeautifulSoup) -> Dict[str, Any]:
