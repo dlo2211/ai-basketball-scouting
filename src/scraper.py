@@ -26,7 +26,7 @@ def parse_sportsref_stats(soup: BeautifulSoup) -> Dict[str, Any]:
             m = re.search(
                 r'<!--\s*(<table[^>]*id="per_game"[^>]*>.*?</table>)\s*-->',
                 str(wrapper),
-                flags=re.DOTALL,
+                flags=re.DOTALL
             )
             if m:
                 html_table = m.group(1)
