@@ -1,9 +1,1 @@
-language = "bash"
-run = ".pythonlibs/bin/python -m streamlit run src/app.py --server.address=0.0.0.0 --server.port=8501 --server.headless=true"
-
-[[ports]]
-localPort = 8501
-externalPort = 80
-
-[nix]
-packages = ["python3", "python3Full"]
+run = "streamlit run src/app.py --server.headless true"
